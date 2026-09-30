@@ -1,0 +1,32 @@
+name: GreenSnap
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'GreenSnap/**'
+      - '.github/workflows/greensnap.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: GreenSnap/build.sh
+      - name: Download-Link aktualisieren
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view greensnap >/dev/null 2>&1 || gh release create greensnap --target "$GITHUB_SHA" --latest=false \
+            --title "GreenSnap – aktuelle Version" \
+            --notes "Download: GreenSnap.zip unten bei Assets. Entpacken und GreenSnap.app in den Ordner Programme ziehen.
+
+          Beim ersten Öffnen meldet macOS, dass die App nicht geprüft werden kann. Dann: Systemeinstellungen → Datenschutz & Sicherheit → ganz unten „Dennoch öffnen“. Alternativ im Terminal: xattr -dr com.apple.quarantine /Applications/GreenSnap.app
+
+          Voraussetzung: macOS 14 (Sonoma) oder neuer. Beim ersten Start fragt macOS nach der Berechtigung für Bildschirmaufnahme."
+          gh release upload greensnap GreenSnap/build/GreenSnap.zip --clobber

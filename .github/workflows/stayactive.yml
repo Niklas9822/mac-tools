@@ -1,0 +1,32 @@
+name: StayActive
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'StayActive/**'
+      - '.github/workflows/stayactive.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: StayActive/build.sh
+      - name: Download-Link aktualisieren
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view stayactive >/dev/null 2>&1 || gh release create stayactive --target "$GITHUB_SHA" --latest=false \
+            --title "StayActive – aktuelle Version" \
+            --notes "Download: StayActive.zip unten bei Assets. Entpacken und StayActive.app in den Ordner Programme ziehen.
+
+          Beim ersten Öffnen meldet macOS, dass die App nicht geprüft werden kann. Dann: Systemeinstellungen → Datenschutz & Sicherheit → ganz unten „Dennoch öffnen“. Alternativ im Terminal: xattr -dr com.apple.quarantine /Applications/StayActive.app
+
+          Voraussetzung: macOS 12 oder neuer. Für den Maus-Impuls fragt die App nach der Berechtigung „Bedienungshilfen“."
+          gh release upload stayactive StayActive/build/StayActive.zip --clobber
