@@ -46,6 +46,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         updateAlwaysHiddenSection()
         apply()
 
+        note("Gestartet")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in self?.note("3 s nach Start") }
+
         // Die Menüs der aktiven App bestimmen, wie viel Platz es gibt – bei App-Wechsel neu messen.
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(activeAppChanged),
                                                           name: NSWorkspace.didActivateApplicationNotification,
@@ -53,6 +56,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     @objc private func activeAppChanged() {
+        note("App-Wechsel – neu messen")
         fittedLength.removeAll()
         switch state {
         case .collapsed: hide(hiddenSeparator)
@@ -115,6 +119,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     func collapse() {
+        note("Einklappen angefordert")
         guard checkOrder(includeAlwaysHidden: false) else { return }
         state = .collapsed
         apply()
@@ -132,6 +137,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
            !isWide(alwaysHiddenSeparator!) {
             ok = ok && hiddenFrame.minX >= a.maxX - 1
         }
+        note("Reihenfolge-Prüfung: Pfeil \(toggleFrame), Linie \(hiddenFrame) → \(ok ? "ok" : "FALSCH")")
         if !ok {
             NSApp.activate(ignoringOtherApps: true)
             let alert = NSAlert()
@@ -319,6 +325,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         f.dateFormat = "HH:mm:ss"
         log.append("\(f.string(from: Date())) \(s)")
         if log.count > 60 { log.removeFirst(log.count - 60) }
+        writeDiagnosticsFile()
     }
 
     private func warnFailure() {
@@ -343,6 +350,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     private func writeDiagnosticsFile() {
+        try? FileManager.default.createDirectory(at: MenuBarController.diagnosticsFile.deletingLastPathComponent(),
+                                                 withIntermediateDirectories: true)
         try? diagnosticsText().write(to: MenuBarController.diagnosticsFile, atomically: true, encoding: .utf8)
     }
 
