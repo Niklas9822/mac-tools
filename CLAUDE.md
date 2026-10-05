@@ -107,4 +107,8 @@ Pfeil rechts der Linie liegt, sonst würde er sich selbst verstecken. Keine Bere
 ## Architektur StayActive
 
 Alles in `StayActive/Sources/main.swift`: `Prefs`, `KeepAlive` (ProcessInfo-Activity gegen Schlaf/App Nap,
-`IOPMAssertionDeclareUserActivity`, optionaler 1-px-Maus-Impuls nur bei Inaktivität) und das Menü im `AppDelegate`.
+`IOPMAssertionDeclareUserActivity`, optionaler 1-px-Maus-Impuls nur bei Inaktivität), `TimeText` (Restzeit-/Uhrzeit-Texte),
+`HUD` (kurze Einblendung ohne Mitteilungs-Berechtigung), `StatusHeaderView` (Status + Fortschrittsbalken im Menü) und
+das Menü im `AppDelegate`. Ein Zeitraum wird als `endDate`/`startDate` in `UserDefaults` gespeichert und übersteht so
+einen Neustart; ein einziger `tickTimer` aktualisiert die Restzeit in der Menüleiste genau dann, wenn sich die Anzeige
+ändert, und schaltet bei Ablauf ab. Klick öffnet das Menü (`statusItem.menu` wird nur kurz gesetzt), ⌥-Klick schaltet um.

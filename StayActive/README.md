@@ -3,16 +3,41 @@
 Kleine Menüleisten-App (☕ oben rechts), die deinen Mac aktiv hält – damit z. B.
 Microsoft Teams dich nicht auf „Abwesend“ setzt und der Mac nicht in den Ruhezustand geht.
 
-## Funktionen
+## So sieht's aus
 
-- **Aktiv halten** (an/aus): verhindert Ruhezustand von Mac und Bildschirm und meldet dem
-  System regelmäßig Nutzeraktivität.
-- **Maus-Impuls (für Teams-Status)**: bewegt den Mauszeiger um 1 Pixel hin und zurück –
-  aber nur, wenn du gerade selbst nichts tust. Das ist der zuverlässigste Weg, damit Teams
-  grün bleibt. Braucht die Berechtigung *Bedienungshilfen*.
-- **Intervall**: 30 s / 1 / 2 / 4 Minuten (Standard: 1 Minute; Teams wird nach ca. 5 Min. gelb).
-- **Aktiv lassen für**: unbegrenzt oder 1/2/4/8 Stunden, danach schaltet es sich ab.
-- **Beim Anmelden starten** (ab macOS 13).
+- **Tasse in der Menüleiste**: gefüllt = aktiv, nur Umriss = aus (Mac darf schlafen).
+  Läuft ein Zeitraum, steht die **Restzeit direkt daneben**, z. B. `☕ 1:23` (Std:Min),
+  in der letzten Minute sekundengenau. Bei „Unbegrenzt“ nur die Tasse.
+- **Klick** auf die Tasse öffnet das Menü, **⌥-Klick** schaltet direkt ein/aus (unbegrenzt).
+- **Bestätigung**: Beim Starten, Ausschalten und Ablaufen erscheint oben in der Bildschirmmitte
+  kurz eine Einblendung, z. B. „Aktiv für 2 Std. – bis 15:40“ oder
+  „StayActive aus – Mac darf wieder schlafen“. Dafür ist keine Mitteilungs-Berechtigung nötig.
+
+## Menü
+
+- **Status oben** (groß): „Aktiv – noch 1 Std. 23 Min.“ mit „bis 15:40“ und einem
+  Fortschrittsbalken, bzw. „Aktiv – unbegrenzt“ oder „Aus – Mac darf schlafen“.
+- **Jetzt ausschalten** / **Jetzt aktivieren (unbegrenzt)**, bei laufendem Zeitraum
+  zusätzlich **Verlängern um 30 Min.**
+- **Starten für …**: Unbegrenzt, 15 Min., 30 Min., 1 / 2 / 4 / 8 Std., **Bis Feierabend**
+  (Standard 17:00), **Bis Uhrzeit …** (Uhrzeit wählen, ggf. morgen) und **Eigene Dauer …**
+  (z. B. `90`, `1:30` oder `2h`). Ein Klick startet sofort bzw. startet neu; das Häkchen zeigt
+  die aktive Auswahl. Danach schaltet sich StayActive selbst ab.
+- **Optionen**:
+  - **Maus-Impuls (für Teams-Status)**: bewegt den Mauszeiger um 1 Pixel hin und zurück –
+    aber nur, wenn du gerade selbst nichts tust. Das ist der zuverlässigste Weg, damit Teams
+    grün bleibt. Braucht die Berechtigung *Bedienungshilfen* (Status steht direkt darunter).
+  - **Impuls-Intervall**: 30 s / 1 / 2 / 4 Minuten (Standard: 1 Minute; Teams wird nach ca. 5 Min. gelb).
+  - **Feierabend-Zeit ändern …**, **Restzeit in der Menüleiste anzeigen**, **Bestätigung einblenden**.
+  - **Beim Start automatisch aktivieren**: schaltet beim App-Start immer ein (unbegrenzt),
+    auch wenn es zuletzt aus war.
+  - **Beim Anmelden starten** (ab macOS 13).
+
+Was StayActive tut, solange es aktiv ist: Ruhezustand von Mac und Bildschirm verhindern und dem
+System regelmäßig Nutzeraktivität melden (plus optional Maus-Impuls).
+
+Ein laufender Zeitraum übersteht einen Neustart der App: Startest du StayActive vor Ablauf neu,
+läuft der Countdown weiter; ist die Zeit inzwischen abgelaufen, bleibt es aus.
 
 Voraussetzung: macOS 12 oder neuer, Apple Silicon oder Intel.
 
