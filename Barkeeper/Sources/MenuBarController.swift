@@ -20,6 +20,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     private(set) var state: State = .expanded
 
+    /// Breite, mit der das Ausblenden auf diesem System tatsächlich funktioniert (wird gemessen).
+    private var fittedLength: [ObjectIdentifier: CGFloat] = [:]
+    private var hideGeneration = 0
+    private var log: [String] = []
+    private var didWarnFailure = false
+
     override init() {
         MenuBarController.seedPositions()
         // Reihenfolge wichtig: neu erstellte Symbole erscheinen links der zuvor erstellten.
@@ -39,6 +45,20 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         updateAlwaysHiddenSection()
         apply()
+
+        // Die Menüs der aktiven App bestimmen, wie viel Platz es gibt – bei App-Wechsel neu messen.
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(activeAppChanged),
+                                                          name: NSWorkspace.didActivateApplicationNotification,
+                                                          object: nil)
+    }
+
+    @objc private func activeAppChanged() {
+        fittedLength.removeAll()
+        switch state {
+        case .collapsed: hide(hiddenSeparator)
+        case .expanded: if let a = alwaysHiddenSeparator { hide(a) }
+        case .showAll: break
+        }
     }
 
     /// Startpositionen festlegen, damit der Pfeil rechts der Trennlinien liegt (nur beim allerersten Start).
@@ -100,14 +120,16 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         apply()
     }
 
+    private func isWide(_ item: NSStatusItem) -> Bool { item.length > 100 }
+
     /// Sicherheitsprüfung: Liegt der Pfeil links der Trennlinie, würde er sich selbst ausblenden.
     private func checkOrder(includeAlwaysHidden: Bool) -> Bool {
         guard let toggleFrame = toggleItem.button?.window?.frame,
               let hiddenFrame = hiddenSeparator.button?.window?.frame,
-              hiddenSeparator.length < MenuBarController.collapsedLength else { return true }
+              !isWide(hiddenSeparator) else { return true }
         var ok = toggleFrame.minX >= hiddenFrame.maxX - 1
         if includeAlwaysHidden, let a = alwaysHiddenSeparator?.button?.window?.frame,
-           alwaysHiddenSeparator!.length < MenuBarController.collapsedLength {
+           !isWide(alwaysHiddenSeparator!) {
             ok = ok && hiddenFrame.minX >= a.maxX - 1
         }
         if !ok {
@@ -125,15 +147,16 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     private func apply() {
+        hideGeneration += 1 // laufende Messungen abbrechen
         let showLines = Prefs.showSeparators
         switch state {
         case .collapsed:
-            hiddenSeparator.length = MenuBarController.collapsedLength
-            hiddenSeparator.button?.image = nil
-            setAlwaysHidden(collapsed: true)
+            // Der Bereich „immer ausgeblendet“ liegt links und wird mit verdrängt.
+            if let a = alwaysHiddenSeparator { setSeparator(a, dashed: true, visible: false) }
+            hide(hiddenSeparator)
         case .expanded:
             setSeparator(hiddenSeparator, dashed: false, visible: showLines)
-            setAlwaysHidden(collapsed: true)
+            if let a = alwaysHiddenSeparator { hide(a) }
         case .showAll:
             setSeparator(hiddenSeparator, dashed: false, visible: showLines)
             setAlwaysHidden(collapsed: false)
@@ -149,12 +172,165 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     private func setAlwaysHidden(collapsed: Bool) {
         guard let item = alwaysHiddenSeparator else { return }
-        if collapsed {
-            item.length = MenuBarController.collapsedLength
-            item.button?.image = nil
-        } else {
-            setSeparator(item, dashed: true, visible: true)
+        if collapsed { hide(item) } else { setSeparator(item, dashed: true, visible: true) }
+    }
+
+    // MARK: Ausblenden mit Messung
+
+    /// Macht eine Trennlinie so breit, dass alle Symbole links von ihr aus der Menüleiste verdrängt werden.
+    /// Klassisch genügt eine riesige Breite. Neuere macOS-Versionen verstecken aber ein Symbol, das nicht
+    /// mehr passt, statt die anderen zu verdrängen – dann wird die größte noch passende Breite gesucht.
+    private func hide(_ item: NSStatusItem) {
+        hideGeneration += 1
+        let gen = hideGeneration
+        let key = ObjectIdentifier(item)
+
+        // 1. Schmal machen, damit die Position stimmt, und die Symbole links davon merken.
+        if isWide(item) { item.length = MenuBarController.separatorLength }
+        item.button?.image = nil
+        after(0.12, gen) {
+            guard let sepFrame = self.cgFrame(of: item) else {
+                self.note("Trennlinie nicht gefunden – Ausblenden übersprungen")
+                return
+            }
+            let targets = self.statusWindows(allLayers: true).filter { $0.layer > 0 && $0.frame.maxX <= sepFrame.minX + 1 && abs($0.frame.minY - sepFrame.minY) < 30 }
+            let targetIDs = Set(targets.map(\.id))
+            self.note("Ausblenden: \(targets.count) Symbole links der Linie (Linie bei x=\(Int(sepFrame.minX)))")
+
+            // 2. Zuerst bekannte bzw. klassische Breite probieren.
+            item.length = self.fittedLength[key] ?? MenuBarController.collapsedLength
+            self.after(0.2, gen) {
+                let visible = self.visibleCount(targetIDs)
+                if visible == 0 {
+                    self.note("OK mit Breite \(Int(item.length))")
+                    return
+                }
+                self.note("Breite \(Int(item.length)): noch \(visible) sichtbar – suche passende Breite")
+                let screenWidth = (self.toggleItem.button?.window?.screen ?? NSScreen.main)?.frame.width ?? 3000
+                self.search(item, key: key, lo: MenuBarController.separatorLength, hi: screenWidth,
+                            targets: targetIDs, gen: gen)
+            }
         }
+    }
+
+    private func search(_ item: NSStatusItem, key: ObjectIdentifier, lo: CGFloat, hi: CGFloat,
+                        targets: Set<CGWindowID>, gen: Int) {
+        if hi - lo < 4 {
+            item.length = lo
+            fittedLength[key] = lo
+            after(0.15, gen) {
+                let visible = self.visibleCount(targets)
+                self.note("Ergebnis: Breite \(Int(lo)), noch sichtbar: \(visible)")
+                if visible > 0 { self.warnFailure() }
+            }
+            return
+        }
+        let mid = ((lo + hi) / 2).rounded()
+        item.length = mid
+        after(0.1, gen) {
+            if self.cgFrame(of: item) != nil {
+                self.search(item, key: key, lo: mid, hi: hi, targets: targets, gen: gen)
+            } else {
+                self.search(item, key: key, lo: lo, hi: mid, targets: targets, gen: gen)
+            }
+        }
+    }
+
+    private func after(_ seconds: Double, _ gen: Int, _ block: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
+            guard let self, gen == self.hideGeneration else { return }
+            block()
+        }
+    }
+
+    private struct BarWindow {
+        let id: CGWindowID
+        let frame: CGRect
+        let owner: String
+        let layer: Int
+    }
+
+    /// Sichtbare Fenster in Höhe der Menüleiste (Status-Symbole), globale Koordinaten oben links.
+    private func statusWindows(allLayers: Bool = false) -> [BarWindow] {
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else { return [] }
+        let statusLayer = Int(CGWindowLevelForKey(.statusWindow))
+        let screens = NSScreen.screens.map(\.frame)
+        let primaryHeight = screens.first?.height ?? 0
+        return list.compactMap { info in
+            guard let layer = info[kCGWindowLayer as String] as? Int,
+                  allLayers || layer == statusLayer,
+                  let number = info[kCGWindowNumber as String] as? UInt32,
+                  let dict = info[kCGWindowBounds as String] as? NSDictionary,
+                  let frame = CGRect(dictionaryRepresentation: dict as CFDictionary),
+                  frame.height <= 60, frame.width > 0 else { return nil }
+            // muss auf einem Bildschirm liegen (oben, in der Menüleiste)
+            let onScreen = screens.contains { s in
+                let top = primaryHeight - s.maxY
+                return frame.minX >= s.minX - 1 && frame.maxX <= s.maxX + 1 && abs(frame.minY - top) < 40
+            }
+            guard onScreen else { return nil }
+            let owner = info[kCGWindowOwnerName as String] as? String ?? "?"
+            return BarWindow(id: number, frame: frame, owner: owner, layer: layer)
+        }
+    }
+
+    /// Rahmen unseres Status-Symbols, falls es sichtbar in der Menüleiste steht.
+    private func cgFrame(of item: NSStatusItem) -> CGRect? {
+        guard let number = item.button?.window?.windowNumber, number > 0 else { return nil }
+        return statusWindows(allLayers: true).first { $0.id == CGWindowID(number) }?.frame
+    }
+
+    private func visibleCount(_ targets: Set<CGWindowID>) -> Int {
+        statusWindows(allLayers: true).filter { targets.contains($0.id) }.count
+    }
+
+    private func note(_ s: String) {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        log.append("\(f.string(from: Date())) \(s)")
+        if log.count > 60 { log.removeFirst(log.count - 60) }
+    }
+
+    private func warnFailure() {
+        guard !didWarnFailure else { return }
+        didWarnFailure = true
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Ausblenden hat nicht geklappt"
+        alert.informativeText = """
+        Auf dieser macOS-Version konnte Barkeeper die Symbole nicht verdrängen.
+
+        Bitte „Diagnose kopieren“ wählen und den Text an den Entwickler schicken – damit lässt sich das gezielt beheben.
+        """
+        alert.addButton(withTitle: "Diagnose kopieren")
+        alert.addButton(withTitle: "Schließen")
+        if alert.runModal() == .alertFirstButtonReturn { copyDiagnostics() }
+    }
+
+    func copyDiagnostics() {
+        var lines: [String] = []
+        lines.append("Barkeeper-Diagnose")
+        lines.append("macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)")
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        lines.append("Barkeeper: \(version), Zustand: \(state)")
+        for (i, s) in NSScreen.screens.enumerated() {
+            lines.append("Bildschirm \(i): \(s.frame) sichtbar \(s.visibleFrame) Notch-Bereiche: \(s.auxiliaryTopLeftArea.map { "\($0)" } ?? "-") / \(s.auxiliaryTopRightArea.map { "\($0)" } ?? "-")")
+        }
+        let ours: [(String, NSStatusItem?)] = [("Pfeil", toggleItem), ("Linie", hiddenSeparator), ("Immer-Linie", alwaysHiddenSeparator)]
+        for (name, item) in ours {
+            guard let item else { continue }
+            let w = item.button?.window
+            lines.append("\(name): Länge \(Int(item.length)), Fenster \(w?.windowNumber ?? -1), Rahmen \(w?.frame ?? .zero), sichtbar \(w?.occlusionState.contains(.visible) ?? false), CG \(cgFrame(of: item).map { "\($0)" } ?? "nicht sichtbar")")
+        }
+        lines.append("Fenster in der Menüleiste:")
+        for w in statusWindows(allLayers: true).sorted(by: { $0.frame.minX < $1.frame.minX }) {
+            lines.append("  #\(w.id) Ebene \(w.layer) \(w.owner): x=\(Int(w.frame.minX)) y=\(Int(w.frame.minY)) b=\(Int(w.frame.width)) h=\(Int(w.frame.height))")
+        }
+        lines.append("Protokoll:")
+        lines.append(contentsOf: log.map { "  " + $0 })
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(lines.joined(separator: "\n"), forType: .string)
     }
 
     private func setSeparator(_ item: NSStatusItem, dashed: Bool, visible: Bool) {
@@ -201,6 +377,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             return
         }
         guard state != .collapsed else { return }
+        guard !isWide(hiddenSeparator) else { return }
         // Ohne Rückfrage-Dialog: bei falscher Reihenfolge lieber ausgeklappt lassen.
         if let toggleFrame = toggleItem.button?.window?.frame,
            let hiddenFrame = hiddenSeparator.button?.window?.frame,
@@ -235,6 +412,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
         menu.addItem(.separator())
         menu.addItem(item("So funktioniert's …", #selector(menuHelp)))
+        menu.addItem(item("Diagnose kopieren", #selector(menuDiagnostics)))
         let settings = item("Einstellungen …", #selector(menuSettings))
         settings.keyEquivalent = ","
         menu.addItem(settings)
@@ -261,6 +439,14 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func menuToggle() { toggle() }
     @objc private func menuShowAll() { showAll() }
     @objc private func menuHelp() { MenuBarController.showHelp() }
+    @objc private func menuDiagnostics() {
+        copyDiagnostics()
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Diagnose kopiert"
+        alert.informativeText = "Der Text liegt in der Zwischenablage und kann jetzt eingefügt werden (⌘V)."
+        alert.runModal()
+    }
     @objc private func menuSettings() { SettingsWindowController.show() }
     @objc private func menuQuit() { NSApp.terminate(nil) }
 
