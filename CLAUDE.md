@@ -11,6 +11,7 @@ Jede App liegt in einem eigenen Ordner und wird mit `swiftc` direkt gebaut.
 | Ordner | App | Minimum | Zweck |
 |---|---|---|---|
 | `GreenSnap/` | GreenSnap | macOS 14 | Screenshots im Stil von Greenshot: Bereich/Fenster/Vollbild, Editor zum Markieren, Kopieren ohne Datei, OCR, Anheften |
+| `Barkeeper/` | Barkeeper | macOS 13 | Menüleisten-Symbole ein-/ausklappen (Alternative zu Bartender) |
 | `StayActive/` | StayActive | macOS 12 | Hält den Mac wach / Teams-Status grün (Power-Assertion + optionaler Maus-Impuls) |
 
 Sprache der Oberfläche, Kommentare und Commit-Texte: **Deutsch** (Code-Bezeichner Englisch).
@@ -49,11 +50,12 @@ erzeugt das App-Symbol (nur GreenSnap, via `IconTool/`), signiert ad-hoc und zip
 
 ## Releases / Download-Links
 
-`.github/workflows/greensnap.yml` und `stayactive.yml` laufen bei Push auf `main` (nur wenn sich der
+`.github/workflows/greensnap.yml`, `stayactive.yml` und `barkeeper.yml` laufen bei Push auf `main` (nur wenn sich der
 jeweilige App-Ordner ändert) und laden die Zip in ein festes Release hoch:
 
 - https://github.com/Niklas9822/mac-tools/releases/download/greensnap/GreenSnap.zip
 - https://github.com/Niklas9822/mac-tools/releases/download/stayactive/StayActive.zip
+- https://github.com/Niklas9822/mac-tools/releases/download/barkeeper/Barkeeper.zip
 
 Also: **Merge nach `main` = neue öffentliche Version.** Nur fertige, getestete Stände mergen.
 Versionsnummer bei nennenswerten Änderungen in der jeweiligen `Info.plist` erhöhen
@@ -84,6 +86,23 @@ Konventionen:
   anpassen. Jede Zustandsänderung vorher mit `pushUndo()` sichern.
 - Screenshots **nicht** automatisch als Datei speichern – das ist eine bewusste Designentscheidung.
 - Neue Einstellungen in `Prefs` mit sinnvollem Default; UI in `SettingsWindow.swift`.
+
+## Architektur Barkeeper
+
+| Datei | Inhalt |
+|---|---|
+| `main.swift` | `AppDelegate`, Start (eingeklappt / Intro beim ersten Start), globales Kürzel |
+| `MenuBarController.swift` | Pfeil + Trennlinien als `NSStatusItem`, Zustände eingeklappt/ausgeklappt/alles, Auto-Einklappen, Menü |
+| `Prefs.swift` | Einstellungen, `Shortcut` |
+| `SettingsWindow.swift` | Einstellungsfenster |
+| `HotKeys.swift`, `ShortcutRecorder.swift` | Kopien aus GreenSnap (globale Kürzel, Kürzel-Aufnahme) |
+| `AppIcon.swift` | App-Symbol für `.icns` (via `IconTool/`) |
+
+Mechanismus: Eine Trennlinie mit `length = 10_000` schiebt alle Status-Symbole links von ihr aus dem
+sichtbaren Bereich; schmal (12 pt) sind sie wieder da. Positionen merkt sich macOS über `autosaveName`
+(`BarkeeperToggle`, `BarkeeperHidden`, `BarkeeperAlwaysHidden`); beim ersten Start werden über
+`NSStatusItem Preferred Position <name>` Startpositionen gesetzt. Vor dem Einklappen wird geprüft, dass der
+Pfeil rechts der Linie liegt, sonst würde er sich selbst verstecken. Keine Berechtigungen nötig – so soll es bleiben.
 
 ## Architektur StayActive
 
