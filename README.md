@@ -6,7 +6,7 @@ Kleine, kostenlose macOS-Apps für Apple Silicon und Intel.
 |---|---|---|
 | **GreenSnap** | Screenshots im Stil von Greenshot: Bereich/Fenster aufnehmen, markieren (Pfeile, Text, Verpixeln, Nummern …), direkt in die Zwischenablage kopieren, Text erkennen (OCR), Anheften. macOS 14+. | [GreenSnap.zip](https://github.com/Niklas9822/mac-tools/releases/download/greensnap/GreenSnap.zip) |
 | **Barkeeper** | Menüleisten-Symbole ein-/ausklappen – schlanke Alternative zu Bartender. macOS 13+. | [Barkeeper.zip](https://github.com/Niklas9822/mac-tools/releases/download/barkeeper/Barkeeper.zip) |
-| **StayActive** | Hält den Mac wach und den Teams-Status grün. macOS 12+. | [StayActive.zip](https://github.com/Niklas9822/mac-tools/releases/download/stayactive/StayActive.zip) |
+| **StayActive** | Hält den Mac wach und den Teams-Status grün – unbegrenzt oder mit Timer und Restzeit in der Menüleiste. macOS 12+. | [StayActive.zip](https://github.com/Niklas9822/mac-tools/releases/download/stayactive/StayActive.zip) |
 
 ## Installation
 
