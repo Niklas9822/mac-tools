@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    StayActive für Windows: eine einzelne, portable StayActive.exe.
+    .NET Framework 4.8 ist auf Windows 10/11 vorinstalliert – keine Laufzeit nötig, kein Installer.
+    Bauen (Windows):  dotnet build StayActiveWindows/StayActive.csproj -c Release
+    Ergebnis:         StayActiveWindows/bin/Release/StayActive.exe
+  -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+
+    <AssemblyName>StayActive</AssemblyName>
+    <RootNamespace>StayActive</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>StayActive.ico</ApplicationIcon>
+
+    <!-- AnyCPU ohne 32-Bit-Zwang: läuft als 64-Bit-Prozess (auf ARM64 je nach .NET-Version nativ oder emuliert). -->
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+
+    <!-- Nur die .exe: keine .pdb, keine .exe.config, kein Unterordner pro Framework. -->
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
+    <GenerateSupportedRuntime>false</GenerateSupportedRuntime>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <SatelliteResourceLanguages>de</SatelliteResourceLanguages>
+
+    <Version>1.0.0</Version>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Product>StayActive</Product>
+    <AssemblyTitle>StayActive</AssemblyTitle>
+    <Description>StayActive – hält den PC wach und den Teams-Status grün</Description>
+    <Company>github.com/Niklas9822/mac-tools</Company>
+    <Copyright>Niklas Tewes</Copyright>
+    <NeutralLanguage>de-DE</NeutralLanguage>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Referenz-Assemblies für net48, damit der Build ohne installiertes Targeting Pack funktioniert. -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!--
+    WinForms/GDI+ direkt referenzieren statt <UseWindowsForms>: unter net48 ist das gleichwertig, und so lässt sich
+    das Projekt auch mit dem .NET SDK unter Linux/macOS probehalber kompilieren (dort fehlt das WindowsDesktop-SDK).
+  -->
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="tools/**" />
+    <None Remove="README.md" />
+  </ItemGroup>
+
+</Project>

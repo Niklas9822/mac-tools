@@ -1,0 +1,54 @@
+name: StayActive (Windows)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'StayActiveWindows/**'
+      - '.github/workflows/stayactive-windows.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'StayActiveWindows/**'
+      - '.github/workflows/stayactive-windows.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: dotnet build StayActiveWindows/StayActive.csproj -c Release
+      - name: Paketieren
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+          Copy-Item StayActiveWindows/bin/Release/StayActive.exe out/StayActive.exe
+          Compress-Archive -Path out/StayActive.exe -DestinationPath out/StayActive-Windows.zip -Force
+          $exe = Get-Item out/StayActive.exe
+          $zip = Get-Item out/StayActive-Windows.zip
+          Write-Host "StayActive.exe: $($exe.Length) Bytes, StayActive-Windows.zip: $($zip.Length) Bytes"
+          "StayActive.exe: **$([math]::Round($exe.Length / 1KB)) KB** (Zip: $([math]::Round($zip.Length / 1KB)) KB)" >> $env:GITHUB_STEP_SUMMARY
+      - name: Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: StayActive-Windows
+          path: out/StayActive.exe
+          retention-days: 14
+      - name: Download-Link aktualisieren
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view stayactive-windows >/dev/null 2>&1 || gh release create stayactive-windows --target "$GITHUB_SHA" --latest=false \
+            --title "StayActive für Windows – aktuelle Version" \
+            --notes "Download: StayActive.exe unten bei Assets (alternativ StayActive-Windows.zip). Keine Installation und keine Administratorrechte nötig – einfach doppelklicken. Die Tasse erscheint unten rechts im Infobereich der Taskleiste (ggf. hinter dem Pfeil ^).
+
+          Beim ersten Start meldet Windows evtl. „Der Computer wurde durch Windows geschützt“ (SmartScreen, weil das Programm nicht signiert ist). Dann auf „Weitere Informationen“ und danach „Trotzdem ausführen“ klicken. Alternativ vorher: Rechtsklick auf StayActive.exe → Eigenschaften → unten „Zulassen“ anhaken.
+
+          Voraussetzung: Windows 10 oder 11 (.NET Framework 4.8 ist dort bereits enthalten). Auf verwalteten Firmen-PCs können nicht signierte Programme gesperrt sein (AppLocker/Intune) – dann startet StayActive nicht."
+          gh release upload stayactive-windows out/StayActive.exe out/StayActive-Windows.zip --clobber

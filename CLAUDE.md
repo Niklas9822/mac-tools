@@ -6,13 +6,15 @@ mit ihrem jeweils eigenen Claude Code zusammen: **Niklas9822** (Owner) und **Sch
 ## Was ist das hier?
 
 Kleine, eigenständige macOS-Menüleisten-Apps in Swift/AppKit, **ohne Xcode-Projekt und ohne Abhängigkeiten**.
-Jede App liegt in einem eigenen Ordner und wird mit `swiftc` direkt gebaut.
+Jede App liegt in einem eigenen Ordner und wird mit `swiftc` direkt gebaut. Ausnahme: `StayActiveWindows/` ist die
+Windows-Version von StayActive (C#/WinForms, .NET Framework 4.8, gebaut mit `dotnet build`).
 
 | Ordner | App | Minimum | Zweck |
 |---|---|---|---|
 | `GreenSnap/` | GreenSnap | macOS 14 | Screenshots im Stil von Greenshot: Bereich/Fenster/Vollbild, Editor zum Markieren, Kopieren ohne Datei, OCR, Anheften |
 | `Barkeeper/` | Barkeeper | macOS 13 | Menüleisten-Symbole ein-/ausklappen (Alternative zu Bartender) |
 | `StayActive/` | StayActive | macOS 12 | Hält den Mac wach / Teams-Status grün (Power-Assertion + optionaler Maus-Impuls) |
+| `StayActiveWindows/` | StayActive für Windows | Windows 10 | Dasselbe für Windows: eine portable `StayActive.exe` im Infobereich, ohne Installation und ohne Adminrechte |
 
 Sprache der Oberfläche, Kommentare und Commit-Texte: **Deutsch** (Code-Bezeichner Englisch).
 
@@ -50,16 +52,19 @@ erzeugt das App-Symbol (nur GreenSnap, via `IconTool/`), signiert ad-hoc und zip
 
 ## Releases / Download-Links
 
-`.github/workflows/greensnap.yml`, `stayactive.yml` und `barkeeper.yml` laufen bei Push auf `main` (nur wenn sich der
-jeweilige App-Ordner ändert) und laden die Zip in ein festes Release hoch:
+`.github/workflows/greensnap.yml`, `stayactive.yml`, `barkeeper.yml` und `stayactive-windows.yml` laufen bei Push auf
+`main` (nur wenn sich der jeweilige App-Ordner ändert) und laden die Datei in ein festes Release hoch:
 
 - https://github.com/Niklas9822/mac-tools/releases/download/greensnap/GreenSnap.zip
 - https://github.com/Niklas9822/mac-tools/releases/download/stayactive/StayActive.zip
 - https://github.com/Niklas9822/mac-tools/releases/download/barkeeper/Barkeeper.zip
+- https://github.com/Niklas9822/mac-tools/releases/download/stayactive-windows/StayActive.exe
+  (zusätzlich `StayActive-Windows.zip`)
 
 Also: **Merge nach `main` = neue öffentliche Version.** Nur fertige, getestete Stände mergen.
 Versionsnummer bei nennenswerten Änderungen in der jeweiligen `Info.plist` erhöhen
-(`CFBundleShortVersionString`, `CFBundleVersion`).
+(`CFBundleShortVersionString`, `CFBundleVersion`), bei StayActive für Windows `<Version>`/`<FileVersion>` in
+`StayActiveWindows/StayActive.csproj`.
 
 ## Architektur GreenSnap
 
@@ -112,3 +117,21 @@ Alles in `StayActive/Sources/main.swift`: `Prefs`, `KeepAlive` (ProcessInfo-Acti
 das Menü im `AppDelegate`. Ein Zeitraum wird als `endDate`/`startDate` in `UserDefaults` gespeichert und übersteht so
 einen Neustart; ein einziger `tickTimer` aktualisiert die Restzeit in der Menüleiste genau dann, wenn sich die Anzeige
 ändert, und schaltet bei Ablauf ab. Klick öffnet das Menü (`statusItem.menu` wird nur kurz gesetzt), ⌥-Klick schaltet um.
+
+## Architektur StayActive für Windows
+
+C# 7.3 / WinForms auf **.NET Framework 4.8** (auf Windows 10/11 vorinstalliert) → eine einzelne, portable
+`StayActive.exe` ohne Installer. **Keine Adminrechte** (`app.manifest`: `asInvoker`); geschrieben wird nur nach
+`HKCU\Software\StayActive` (Einstellungen + laufender Zeitraum) und optional `HKCU\…\CurrentVersion\Run` (Autostart).
+Ein `ApplicationContext` (`TrayApp.cs`) ohne Hauptfenster hält `NotifyIcon` + `ContextMenuStrip`; das Menü wird bei
+`Opening` neu aufgebaut, die Kopfzeile läuft bei offenem Menü sekündlich mit. Wach halten in `KeepAlive.cs` per
+`SetThreadExecutionState` (UI-Thread) und optionalem 1-px-`SendInput`-Maus-Impuls nur bei Leerlauf (`GetLastInputInfo`).
+Das Tray-Symbol zeichnet `IconRenderer.cs` zur Laufzeit mit GDI+ inkl. Restzeit (`45`, `2h`, `<1`); alte HICONs werden
+mit `DestroyIcon` freigegeben. Linksklick öffnet das Menü (verzögert um die Doppelklickzeit), Doppelklick schaltet um.
+Nach dem Aufwachen (`SystemEvents.PowerModeChanged`) wird der Ablauf geprüft. Texte/Verhalten bitte mit
+`StayActive/Sources/main.swift` synchron halten.
+
+Bauen: `dotnet build StayActiveWindows/StayActive.csproj -c Release` → `StayActiveWindows/bin/Release/StayActive.exe`.
+Kompilieren geht auch unter Linux (z. B. Claude Code in der Cloud, `apt-get install dotnet-sdk-8.0`), ausführen nur
+unter Windows – Verhalten also auf einem echten Windows-PC testen. Das Programm-Symbol `StayActive.ico` erzeugt
+`StayActiveWindows/tools/make_icon.py` (Pillow).
